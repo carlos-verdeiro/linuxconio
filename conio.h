@@ -59,9 +59,31 @@ void resetTermios(void)
 int getch_(int echo)
 {
     int ch;
-    initTermios(echo);
+    initTermios(echo);// Configura o terminal para leitura de caracteres sem bloqueio e sem eco
     ch = getchar();
-    resetTermios();
+
+    if (ch == 27) { 
+        int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);// Salva o estado atual de bloqueio da entrada
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);// Deixa a leitura não bloqueante para ler a sequência de escape das setas
+        
+        int seq1 = getchar();
+        if (seq1 == '[') { // É o início de uma seta
+            int seq2 = getchar();
+            if (seq2 == 'A') ch = 72;      // Seta para Cima
+            else if (seq2 == 'B') ch = 80; // Seta para Baixo
+            else if (seq2 == 'C') ch = 77; // Seta para Direita
+            else if (seq2 == 'D') ch = 75; // Seta para Esquerda
+        } else if (seq1 != EOF) {
+            ungetc(seq1, stdin); // Se não for uma seta, coloca o caractere de volta na entrada
+        }
+        
+        fcntl(STDIN_FILENO, F_SETFL, oldf);// Restaura o estado original de bloqueio
+    } 
+    else if (ch == 10) { 
+        ch = 13;//simila mapeamento do enter para o windows
+    }
+
+    resetTermios();// Restaura o terminal para o estado original
     return ch;
 }
 
