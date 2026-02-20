@@ -59,9 +59,10 @@ void resetTermios(void)
 int getch_(int echo)
 {
     int ch;
-    initTermios(echo);// Configura o terminal para leitura de caracteres sem bloqueio e sem eco
+    initTermios(echo);
     ch = getchar();
 
+    
     if (ch == 27) { 
         int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);// Salva o estado atual de bloqueio da entrada
         fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);// Deixa a leitura não bloqueante para ler a sequência de escape das setas
@@ -83,7 +84,7 @@ int getch_(int echo)
         ch = 13;//simila mapeamento do enter para o windows
     }
 
-    resetTermios();// Restaura o terminal para o estado original
+    resetTermios();
     return ch;
 }
 
@@ -142,73 +143,23 @@ void textcolor(int newcolor)
 
   switch (newcolor)
   {
-  case BLACK:
-    s = "\x1b[30m";
-    break;
-
-  case BLUE:
-    s = "\x1b[34m";
-    break;
-
-  case GREEN:
-    s = "\x1b[32m";
-    break;
-
-  case CYAN:
-    s = "\x1b[36m";
-    break;
-
-  case RED:
-    s = "\x1b[31;1m";
-    break;
-
-  case MAGENTA:
-    s = "\x1b[35m";
-    break;
-
-  case BROWN:
-    s = "\x1b[31m";
-    break;
-
-  case LIGHTGRAY:
-    s = "\x1b[30;1m";
-    break;
-
-  case DARKGRAY:
-    s = "\x1b[30m";
-    break;
-
-  case LIGHTBLUE:
-    s = "\x1b[34;1m";
-    break;
-
-  case LIGHTGREEN:
-    s = "\x1b[32,1m";;
-    break;
-
-  case LIGHTCYAN:
-    s = "\x1b[36;1m";
-    break;
-
-  case LIGHTRED:
-    s = "\x1b[31;1m";
-    break;
-
-  case LIGHTMAGENTA:
-    s = "\x1b[35;1m";
-    break;
-
-  case YELLOW:
-    s = "\x1b[33;1m";
-    break;
-
-  case WHITE:
-    s = "\x1b[37;1m";
-    break;
-
-  case BLINK:
-    s = "\x1b[30m";
-    break;
+  case BLACK:        s = "\x1b[30m"; break;
+  case BLUE:         s = "\x1b[34m"; break;
+  case GREEN:        s = "\x1b[32m"; break;
+  case CYAN:         s = "\x1b[36m"; break;
+  case RED:          s = "\x1b[31m"; break;
+  case MAGENTA:      s = "\x1b[35m"; break;
+  case BROWN:        s = "\x1b[33m"; break;
+  case LIGHTGRAY:    s = "\x1b[37m"; break;
+  case DARKGRAY:     s = "\x1b[30;1m"; break;
+  case LIGHTBLUE:    s = "\x1b[34;1m"; break;
+  case LIGHTGREEN:   s = "\x1b[32;1m"; break; 
+  case LIGHTCYAN:    s = "\x1b[36;1m"; break;
+  case LIGHTRED:     s = "\x1b[31;1m"; break;
+  case LIGHTMAGENTA: s = "\x1b[35;1m"; break;
+  case YELLOW:       s = "\x1b[33;1m"; break;
+  case WHITE:        s = "\x1b[37;1m"; break;
+  case BLINK:        s = "\x1b[5m"; break;
   };
 
   printf("%s", s);
@@ -216,79 +167,29 @@ void textcolor(int newcolor)
 
 void textbackground(int newcolor)
 {
-  //https://en.wikipedia.org/wiki/ANSI_escape_code
+  // https://en.wikipedia.org/wiki/ANSI_escape_code
 
-  const char * s = "\x1b[40m";
+  const char * s = "\x1b[40m"; // Padrão: fundo preto
 
   switch (newcolor)
   {
-  case BLACK:
-    s = "\x1b[40m";
-    break;
-
-  case BLUE:
-    s = "\x1b[44m";
-    break;
-
-  case GREEN:
-    s = "\x1b[42m";
-    break;
-
-  case CYAN:
-    s = "\x1b[46m";
-    break;
-
-  case RED:
-    s = "\x1b[41;1m";
-    break;
-
-  case MAGENTA:
-    s = "\x1b[45m";
-    break;
-
-  case BROWN:
-    s = "\x1b[41m";
-    break;
-
-  case LIGHTGRAY:
-    s = "\x1b[40;1m";
-    break;
-
-  case DARKGRAY:
-    s = "\x1b[40m";
-    break;
-
-  case LIGHTBLUE:
-    s = "\x1b[44;1m";
-    break;
-
-  case LIGHTGREEN:
-    s = "\x1b[42,1m";;
-    break;
-
-  case LIGHTCYAN:
-    s = "\x1b[46;1m";
-    break;
-
-  case LIGHTRED:
-    s = "\x1b[41;1m";
-    break;
-
-  case LIGHTMAGENTA:
-    s = "\x1b[45;1m";
-    break;
-
-  case YELLOW:
-    s = "\x1b[43;1m";
-    break;
-
-  case WHITE:
-    s = "\x1b[47;1m";
-    break;
-
-  case BLINK:
-    s = "\x1b[40m";
-    break;
+  case BLACK:        s = "\x1b[40m"; break;
+  case BLUE:         s = "\x1b[44m"; break;
+  case GREEN:        s = "\x1b[42m"; break;
+  case CYAN:         s = "\x1b[46m"; break;
+  case RED:          s = "\x1b[41m"; break;
+  case MAGENTA:      s = "\x1b[45m"; break;
+  case BROWN:        s = "\x1b[43m"; break;
+  case LIGHTGRAY:    s = "\x1b[47m"; break;
+  case DARKGRAY:     s = "\x1b[100m"; break;
+  case LIGHTBLUE:    s = "\x1b[104m"; break;
+  case LIGHTGREEN:   s = "\x1b[102m"; break;
+  case LIGHTCYAN:    s = "\x1b[106m"; break;
+  case LIGHTRED:     s = "\x1b[101m"; break;
+  case LIGHTMAGENTA: s = "\x1b[105m"; break;
+  case YELLOW:       s = "\x1b[103m"; break;
+  case WHITE:        s = "\x1b[107m"; break;
+  case BLINK:        s = "\x1b[40m"; break;
   };
 
   printf("%s", s);
@@ -371,4 +272,3 @@ int kbhit()
     return 0;
 }
 #endif
-
