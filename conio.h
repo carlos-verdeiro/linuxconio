@@ -7,11 +7,11 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #define cprintf printf
-#define cscanf scanf
-#define cgets gets
-
+//#define cscanf scanf
+ 
 #define CLEAR "\x1b[2J"
 #define SET11 "\x1b[1;1f"
 #define CURSOR_UP "\x1b[1A"
@@ -41,47 +41,99 @@ enum COLORS
   BLINK = 128
 };
 
-static struct termios oldterm, newterm;
+const char* get_mapped_char(unsigned char c) {
+    switch(c) {
+        case 176: return "░"; case 177: return "▒"; case 178: return "▓";
+        case 179: return "│"; case 180: return "┤"; case 181: return "╡";
+        case 182: return "╢"; case 183: return "╖"; case 184: return "╕";
+        case 185: return "╣"; case 186: return "║"; case 187: return "╗";
+        case 188: return "╝"; case 189: return "╜"; case 190: return "╛";
+        case 191: return "┐"; case 192: return "└"; case 193: return "┴";
+        case 194: return "┬"; case 195: return "├"; case 196: return "─";
+        case 197: return "┼"; case 198: return "╞"; case 199: return "╟";
+        case 200: return "╚"; case 201: return "╔"; case 202: return "╩";
+        case 203: return "╦"; case 204: return "╠"; case 205: return "═";
+        case 206: return "╬"; case 207: return "╧"; case 208: return "╨";
+        case 209: return "╤"; case 210: return "╥"; case 211: return "╙";
+        case 212: return "╘"; case 213: return "╒"; case 214: return "╓";
+        case 215: return "╫"; case 216: return "╪"; case 217: return "┘";
+        case 218: return "┌"; case 219: return "█"; case 220: return "▄";
+        case 221: return "▌"; case 222: return "▐"; case 223: return "▀";
+        case 254: return "■";
+        default: return NULL;
+    }
+}
+
+struct termios oldterm, newterm;
+int unget_char = -1; // Buffer para simular o 224 do Windows
+int is_termios_saved = 0; // Trava de segurança para o terminal
+
+void resetTermios(void)
+{
+    // Só restaura se realmente tiver salvo o estado original antes
+    if (is_termios_saved) {
+        tcsetattr(0, TCSANOW, &oldterm);
+    }
+}
 
 void initTermios(int echo)
 {
-    tcgetattr(0, &oldterm);
+    // Salva o estado original do terminal APENAS na primeira vez que rodar
+    if (!is_termios_saved) {
+        tcgetattr(0, &oldterm);
+        is_termios_saved = 1;
+        atexit(resetTermios); // Garante a restauração automática se o programa fechar ou crashar
+    }
+    
     newterm = oldterm;
-    newterm.c_lflag &= ~ICANON;
+    // Desativa modo canônico E os sinais do sistema        ISIG libera o Backspace e mapeia o Ctrl+C cru
+    newterm.c_lflag &= ~(ICANON | ISIG); 
     newterm.c_lflag &= echo ? ECHO : ~ECHO;
     tcsetattr(0, TCSANOW, &newterm);
-}
-void resetTermios(void)
-{
-    tcsetattr(0, TCSANOW, &oldterm);
 }
 
 int getch_(int echo)
 {
+    if (unget_char != -1) {
+        int ch = unget_char;
+        unget_char = -1;
+        return ch;
+    }
+
     int ch;
     initTermios(echo);
     ch = getchar();
 
-    
+    // Lida com esc e teclas especiais
     if (ch == 27) { 
-        int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);// Salva o estado atual de bloqueio da entrada
-        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);// Deixa a leitura não bloqueante para ler a sequência de escape das setas
+        int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
         
         int seq1 = getchar();
-        if (seq1 == '[') { // É o início de uma seta
+        if (seq1 == '[') { 
             int seq2 = getchar();
-            if (seq2 == 'A') ch = 72;      // Seta para Cima
-            else if (seq2 == 'B') ch = 80; // Seta para Baixo
-            else if (seq2 == 'C') ch = 77; // Seta para Direita
-            else if (seq2 == 'D') ch = 75; // Seta para Esquerda
+            
+            // Setas direcionais
+            if (seq2 == 'A') { ch = 224; unget_char = 72; }      // Cima
+            else if (seq2 == 'B') { ch = 224; unget_char = 80; } // Baixo
+            else if (seq2 == 'C') { ch = 224; unget_char = 77; } // Direita
+            else if (seq2 == 'D') { ch = 224; unget_char = 75; } // Esquerda
+            // Teclas extras Delete, Home, End. que geram sequências com ~
+            else if (seq2 >= '1' && seq2 <= '6') {
+                int seq3 = getchar(); // Limpa o ~ final para não sujar o buffer
+                if (seq2 == '3' && seq3 == '~') { ch = 224; unget_char = 83; } // Delete
+            }
         } else if (seq1 != EOF) {
-            ungetc(seq1, stdin); // Se não for uma seta, coloca o caractere de volta na entrada
+            ungetc(seq1, stdin); // Era só o esc sozinho mesmo
         }
         
-        fcntl(STDIN_FILENO, F_SETFL, oldf);// Restaura o estado original de bloqueio
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
     } 
     else if (ch == 10) { 
-        ch = 13;//simila mapeamento do enter para o windows
+        ch = 13; // Enter do Linux para Enter do Windows
+    }
+    else if (ch == 127) {
+        ch = 8; // Backspace do Linux para Backspace do Windows (\b)
     }
 
     resetTermios();
@@ -113,7 +165,6 @@ void gotox(unsigned int x)
     printf("\x1b[%dG", x);
 }
 
-// added the fflush function, it might seem like it does nothing, but it helps on some glitches when using gotoxy
 void gotoxy(unsigned int x, unsigned int y)
 {
     printf("\x1b[%d;%df", y, x);
@@ -137,8 +188,6 @@ void showcursor()
 
 void textcolor(int newcolor)
 {
-  //https://en.wikipedia.org/wiki/ANSI_escape_code
-
   const char * s = "\x1b[30m";
 
   switch (newcolor)
@@ -167,9 +216,7 @@ void textcolor(int newcolor)
 
 void textbackground(int newcolor)
 {
-  // https://en.wikipedia.org/wiki/ANSI_escape_code
-
-  const char * s = "\x1b[40m"; // Padrão: fundo preto
+  const char * s = "\x1b[40m"; // Padrão
 
   switch (newcolor)
   {
@@ -204,18 +251,22 @@ void clreol()
 {
     printf("%s",CLEAR);
 }
+
 int putch(const char c)
 {
-    printf("%c",c);
+    unsigned char uc = (unsigned char)c;
+    const char *mapped = get_mapped_char(uc);
+    if (mapped) fprintf(stdout, "%s", mapped);
+    else putchar(uc);
+    fflush(stdout);
     return (int)c;
 }
 
 int cputs(const char*str)
 {
-    printf(str);
+    printf("%s", str);
     return 0;
 }
-
 
 int wherexy(int *x, int *y)
 {
@@ -231,7 +282,9 @@ int wherexy(int *x, int *y)
         lx = lx * 10 + in - '0';
     *x = lx;
     *y = ly;
+    return 1;
 }
+
 int wherex()
 {
     int x=0,y=0;
@@ -254,7 +307,7 @@ int kbhit()
 
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
+    newt.c_lflag &= ~(ICANON | ECHO | ISIG);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
     fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
@@ -271,4 +324,103 @@ int kbhit()
     }
     return 0;
 }
+
+//implementando gets personalizado pois foi desativado no C11
+char* conio_gets(char* str)
+{
+    int len = 0; 
+    int pos = 0; 
+    int ch;
+    int continuar = 1;
+
+    while (continuar) {
+        ch = getch(); 
+
+        if (ch == 13 || ch == 10) { // Enter
+            str[len] = '\0';
+            putch('\n');
+            continuar = 0; 
+        } 
+        else if (ch == 3) { // Ctrl+C
+            exit(0); 
+        }
+        else if (ch == 8 || ch == 127) { // Backspace
+            if (pos > 0) {
+                for (int j = pos; j < len; j++) {
+                    str[j - 1] = str[j];
+                }
+                pos--;
+                len--;
+                str[len] = '\0';
+
+                printf("\b"); 
+                for (int j = pos; j < len; j++) putch(str[j]); 
+                printf(" "); 
+                
+                for (int j = 0; j <= (len - pos); j++) printf("\b");
+                fflush(stdout);
+            }
+        } 
+        else if (ch == 224) { // Teclas de seta e Delete
+            int seq = getch(); 
+            if (seq == 75) { // Esquerda
+                if (pos > 0) { pos--; printf("\b"); fflush(stdout); }
+            } 
+            else if (seq == 77) { // Direita
+                if (pos < len) { putch(str[pos]); pos++; fflush(stdout); }
+            }
+            else if (seq == 83) { // Delete
+                if (pos < len) {
+                    for (int j = pos + 1; j < len; j++) str[j - 1] = str[j];
+                    len--; str[len] = '\0';
+                    for (int j = pos; j < len; j++) putch(str[j]);
+                    printf(" "); 
+                    for (int j = 0; j <= (len - pos); j++) printf("\b"); 
+                    fflush(stdout);
+                }
+            }
+        } 
+        else if (ch >= 32 && ch <= 255) { // Caracteres imprimíveis
+            for (int j = len; j > pos; j--) {
+                str[j] = str[j - 1];
+            }
+            str[pos] = ch;
+            len++;
+            pos++;
+            str[len] = '\0';
+
+            putch(ch);
+            for (int j = pos; j < len; j++) putch(str[j]);
+            for (int j = 0; j < (len - pos); j++) printf("\b");
+            fflush(stdout);
+        }
+    }
+
+    return str;
+}
+
+int conio_printf(const char *format, ...) {
+    char buf[4096];
+    va_list args;
+    va_start(args, format);
+    int len = vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    for (int i = 0; i < len; i++) {
+        unsigned char uc = (unsigned char)buf[i];
+        const char *mapped = get_mapped_char(uc);
+        if (mapped) fprintf(stdout, "%s", mapped);
+        else putchar(uc);
+    }
+    fflush(stdout);
+    return len;
+}
+
+#undef printf
+#define printf conio_printf
+#undef cprintf
+#define cprintf conio_printf
+#undef gets
+#define gets conio_gets
+
 #endif
