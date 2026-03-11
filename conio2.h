@@ -16,9 +16,6 @@
 #define SET11 "\x1b[1;1f"
 #define CURSOR_UP "\x1b[1A"
 #define ERASE_LINE "\x1b[2K"
-#define BLINK_SLOW "\x1b[5m"
-#define BLINK_RAPID "\x1b[6m"
-#define CC_CLEAR "\x1b[0m"
 
 enum COLORS
 {
@@ -124,7 +121,7 @@ int getch_(int echo)
                 if (seq2 == '3' && seq3 == '~') { ch = 224; unget_char = 83; } // Delete
             }
         } else if (seq1 != EOF) {
-            ungetc(seq1, stdin); // Era só o esc sozinho mesmo
+            ungetc(seq1, stdin); // esc sozinho
         }
         
         fcntl(STDIN_FILENO, F_SETFL, oldf);
@@ -138,11 +135,6 @@ int getch_(int echo)
 
     resetTermios();
     return ch;
-}
-
-void cagxy(unsigned int x, unsigned int y)
-{
-    printf("%s\x1b[%d;%df", CLEAR, y, x);
 }
 
 void clrscr()
@@ -160,11 +152,6 @@ int getche(void)
     return getch_(1);
 }
 
-void gotox(unsigned int x)
-{
-    printf("\x1b[%dG", x);
-}
-
 void gotoxy(unsigned int x, unsigned int y)
 {
     printf("\x1b[%d;%df", y, x);
@@ -174,11 +161,6 @@ void gotoxy(unsigned int x, unsigned int y)
 void nocursor()
 {
     printf("\x1b[?25l");
-}
-
-void normvideo()
-{
-    printf("\x1b[0m");
 }
 
 void showcursor()
@@ -266,37 +248,6 @@ int cputs(const char*str)
 {
     printf("%s", str);
     return 0;
-}
-
-int wherexy(int *x, int *y)
-{
-    printf("\033[6n");
-    if(getch() != '\x1B') return 0;
-    if(getch() != '\x5B') return 0;
-    int in;
-    int ly = 0;
-    while((in = getch()) != ';')
-        ly = ly * 10 + in - '0';
-    int lx = 0;
-    while((in = getch()) != 'R')
-        lx = lx * 10 + in - '0';
-    *x = lx;
-    *y = ly;
-    return 1;
-}
-
-int wherex()
-{
-    int x=0,y=0;
-    wherexy(&x, &y);
-    return x;
-}
-
-int wherey()
-{
-    int x=0,y=0;
-    wherexy(&x, &y);
-    return y;
 }
 
 int kbhit()
